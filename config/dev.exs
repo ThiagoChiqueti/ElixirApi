@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 # Configure your database
 config :real_deal_api, RealDealApi.Repo,

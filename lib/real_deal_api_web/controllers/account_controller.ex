@@ -4,12 +4,12 @@ defmodule RealDealApiWeb.AccountController do
   alias RealDealApiWeb.{Auth.Guardian, Auth.ErrorResponse}
   alias RealDealApi.{Accounts, Accounts.Account, Users, Users.User}
 
-  @doc """
-  plug fica observendo a chamada das funções update e delete e valida se quem está chamando é o dono da conta através da comparação de ID's
-  entre o id do token que fez a requisição e o id da conta a ser atualizada.
 
-  funciona como um middleware do Nodejs
-  """
+ # plug fica observendo a chamada das funções update e delete e valida se quem está chamando é o dono da conta através da comparação de ID's
+  #entre o id do token que fez a requisição e o id da conta a ser atualizada.
+
+  #funciona como um middleware do Nodejs
+
   plug :is_authorized_account when action in [:update, :delete]
 
 
@@ -32,15 +32,16 @@ defmodule RealDealApiWeb.AccountController do
 
   def create(conn, %{"account" => account_params}) do
     with {:ok, %Account{} = account} <- Accounts.create_account(account_params),
-          {:ok, token, _claims} <- Guardian.encode_and_sign(account),
           {:ok, %User{} = _user} <- Users.create_user(account, account_params) do
-      conn
-      |> put_status(:created)
-      |> render("account_token.json", %{account: account, token: token})
+      authorize_account(conn, account.email, account_params["hash_password"])
     end
   end
 
   def sign_in(conn, %{"email" => email, "hash_password" => hash_password}) do
+    authorize_account(conn, email, hash_password)
+  end
+
+  defp authorize_account(conn, email, hash_password) do
     case Guardian.authenticate(email, hash_password) do
       {:ok, account, token} ->
         conn
@@ -49,6 +50,15 @@ defmodule RealDealApiWeb.AccountController do
         |> render("account_token.json", %{account: account, token: token})
       {:error , :invalid_credentials} -> raise ErrorResponse.Unauthorized, message: "Email or Password incorrect."
     end
+  end
+
+  def refresh_session(conn, %{}) do
+    token = Guardian.Plug.current_token(conn)
+    {:ok, account, new_token} = Guardian.authenticate(token)
+    conn
+    |> Plug.Conn.put_session(:account_id, account.id)
+    |> put_status(:ok)
+    |> render("account_token.json", %{account: account, token: new_token})
   end
 
   def sign_out(conn, %{}) do
