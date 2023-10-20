@@ -4,8 +4,26 @@ defmodule RealDealApiWeb.AccountController do
   alias RealDealApiWeb.{Auth.Guardian, Auth.ErrorResponse}
   alias RealDealApi.{Accounts, Accounts.Account, Users, Users.User}
 
+  @doc """
+  plug fica observendo a chamada das funções update e delete e valida se quem está chamando é o dono da conta através da comparação de ID's
+  entre o id do token que fez a requisição e o id da conta a ser atualizada.
+
+  funciona como um middleware do Nodejs
+  """
+  plug :is_authorized_account when action in [:update, :delete]
+
 
   action_fallback RealDealApiWeb.FallbackController
+
+  defp is_authorized_account(conn, _opts) do
+    %{params: %{"account" => params}} = conn
+    account = Accounts.get_account!(params["id"])
+    if conn.assigns.account.id == account.id do
+      conn
+    else
+      raise ErrorResponse.Forbidden
+    end
+  end
 
   def index(conn, _params) do
     accounts = Accounts.list_accounts()
@@ -26,6 +44,7 @@ defmodule RealDealApiWeb.AccountController do
     case Guardian.authenticate(email, hash_password) do
       {:ok, account, token} ->
         conn
+        |> Plug.Conn.put_session(:account_id, account.id)
         |> put_status(:ok)
         |> render("account_token.json", %{account: account, token: token})
       {:error , :invalid_credentials} -> raise ErrorResponse.Unauthorized, message: "Email or Password incorrect."
@@ -37,8 +56,8 @@ defmodule RealDealApiWeb.AccountController do
     render(conn, "show.json", account: account)
   end
 
-  def update(conn, %{"id" => id, "account" => account_params}) do
-    account = Accounts.get_account!(id)
+  def update(conn, %{"account" => account_params}) do
+    account = Accounts.get_account!(account_params["id"])
 
     with {:ok, %Account{} = account} <- Accounts.update_account(account, account_params) do
       render(conn, "show.json", account: account)
