@@ -31,6 +31,11 @@ config :real_deal_api, RealDealApiWeb.Auth.Guardian,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :guardian, Guardian.DB,
+  repo: RealDealApi.Repo,
+  schema_name: "guardian_tokens", #schema do banco de dados /nome da tabela
+  sweep_interval: 60  #tempo que o banco de dados deixa o token salvo, caso o token não esteja no banco de dados ele é automaticamente inválido
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{Mix.env()}.exs"
